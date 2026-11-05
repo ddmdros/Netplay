@@ -1,20 +1,25 @@
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.api.chat_routes import router as chat_router
 
-app = FastAPI(title="NetPlay P2P Matcher API", version="1.0.0")
+load_dotenv()
 
-# Configuração vital de segurança para comunicação com o React
+from .api.chat_routes import router as chat_router  # noqa: E402  (depois do .env)
+
+app = FastAPI(title="NetPlay API", version="1.1.0")
+
+# Em produção, CORS_ORIGINS deve listar só o domínio do front-end.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção trocaremos pelo domínio real do seu front-end
-    allow_credentials=True,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Acopla as rotas do chat com o prefixo /api
 app.include_router(chat_router, prefix="/api")
+
 
 @app.get("/")
 def read_root():

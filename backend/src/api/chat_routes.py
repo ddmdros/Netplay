@@ -1,21 +1,35 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from src.agents.game_agent import get_game_agent_executor
+from pydantic import BaseModel, Field
+
+from ..agents import game_agent
 
 router = APIRouter()
-agent_executor = get_game_agent_executor()
+
+MAX_HISTORY = 10  # últimas mensagens que o front manda: contexto suficiente sem inflar o prompt
+
+
+class Message(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
 
 class ChatRequest(BaseModel):
-    input: str
+    input: str = Field(min_length=1, max_length=2000)
     user_id: str
+    history: list[Message] = []
 
-@router.post("/chat")
-async def handle_chat_message(request: ChatRequest):
+
+class ChatResponse(BaseModel):
+    response: str
+
+
+@router.post("/chat", response_model=ChatResponse)
+def handle_chat_message(request: ChatRequest):
     try:
-        result = agent_executor.invoke({
-            "input": request.input,
-            "user_id": request.user_id
-        })
-        return {"response": result["output"]}
+        agent = game_agent.build_agent(request.user_id)
+        history = [m.model_dump() for m in request.history[-MAX_HISTORY:]]
+        return ChatResponse(response=game_agent.answer(agent, request.input, history))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Erro no agente: {e}") from e

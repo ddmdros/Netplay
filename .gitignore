@@ -13,3 +13,5 @@ frontend/.env
 .env
 .env.local
 .env.*.local
+# Build artifacts
+*.egg-info/

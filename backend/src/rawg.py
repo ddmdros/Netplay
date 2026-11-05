@@ -1,4 +1,4 @@
-# backend/src/dados.py
+"""Cliente da API RAWG: busca jogos e monta um texto limpo para o agente usar como contexto."""
 import requests
 from typing import Any, Dict, List
 

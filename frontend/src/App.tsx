@@ -9,12 +9,13 @@ interface Message {
 }
 
 function App() {
-  const LOGGED_IN_USER_ID = "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d";
+  // Usuário de demonstração: o projeto ainda não tem login.
+  const DEMO_USER_ID = "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d";
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Olá, Diogo! Sou o assistente do NetPlay. Como posso te ajudar com trocas ou aluguéis de jogos hoje?",
+      text: "Olá! Sou o assistente do NetPlay. Posso buscar informações de jogos, classificação etária e onde comprar. Como posso ajudar?",
       sender: "bot",
     },
   ]);
@@ -44,9 +45,14 @@ function App() {
     setIsLoading(true);
 
     try {
+      const history = messages.slice(-10).map((m) => ({
+        role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.text,
+      }));
       const botResponseText = await sendChatMessage(
         userMessageText,
-        LOGGED_IN_USER_ID,
+        DEMO_USER_ID,
+        history,
       );
 
       const newBotMessage: Message = {
