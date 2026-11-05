@@ -4,9 +4,8 @@ A games assistant with **tool calling**: a LangChain agent (OpenAI `gpt-4o-mini`
 fetch real game data from the [RAWG API](https://rawg.io/apidocs) (release date, studio, genre, age rating and
 stores), behind a **FastAPI** API and with a chat in **React + TypeScript**.
 
-The product idea behind it is a P2P economy for physical media: finding games near you to trade or rent. That
-part (Postgres + PostGIS) already has the agent's tools, but the database schema is not in this repository yet.
-It is only turned on when `DATABASE_URL` is set.
+The product idea behind it is a P2P marketplace for physical game media. This repository holds only the part that
+works today, the games assistant; the marketplace is listed under [Next steps](#next-steps).
 
 ## How it works
 
@@ -17,8 +16,8 @@ sequenceDiagram
     participant G as Agent (LangChain)
     participant L as gpt-4o-mini
     participant R as RAWG API
-    U->>A: question + history + user_id
-    A->>G: builds the user's agent
+    U->>A: question + history
+    A->>G: builds the agent
     G->>L: messages + available tools
     L-->>G: tool call buscar_informacoes_de_jogos("...")
     G->>R: search + details of each game
@@ -31,9 +30,6 @@ sequenceDiagram
 
 - **Tool calling:** the model receives the tools' descriptions and chooses when to call them. The prompt forbids
   making up game data, and the answer comes from what RAWG returned.
-- **Database tool safety:** the tools are created per request, already bound to the server-side `user_id`, and
-  do not take the id as an argument, so the model cannot query another person by changing the id in a call. The
-  queries are parameterized.
 - **History:** the front end sends the latest messages, and the API uses the 10 most recent.
 
 ## Running it
@@ -65,7 +61,6 @@ cd frontend && npm run lint && npm run build
 
 The backend tests run with no network and no API keys:
 - RAWG is mocked, to check the structured text and the errors;
-- the database is mocked, to check that the query uses the right user and that the tool does not take a `user_id`;
 - a fake model that calls tools goes through the real agent (`create_agent`), from the tool call to the final
   answer;
 - the API is tested with FastAPI's `TestClient`.
@@ -80,7 +75,6 @@ backend/src/
   api/chat_routes.py    POST /api/chat
   agents/game_agent.py  prompt, tools and create_agent
   tools/game_tools.py   RAWG tool
-  tools/database_tools.py  P2P tools (optional)
   rawg.py               RAWG API client
   cli.py                terminal chat
 frontend/src/           React chat
@@ -95,11 +89,24 @@ revision:
 - migrated the agent to `create_agent`;
 - fixed the imports (the route called a function that did not exist, and the agent imported the tool from the
   wrong file);
-- fixed the nearby-games query, which ignored the user (it used a hard-coded id) and passed parameters the SQL
-  did not have;
-- bound the database tools to the user on the server;
+- removed the unfinished marketplace tools: their database schema was never in the repository (the code is in the
+  git history, and the plan is under Next steps);
 - removed an unused duplicate prompt, the duplicate terminal script and the committed `egg-info`;
 - restricted CORS and added the conversation history, the tests and CI.
+
+## Next steps
+
+The P2P marketplace for physical media, as designed:
+
+- **Database:** Postgres with PostGIS for users, inventory, wishlists and transactions, with the schema and
+  migrations versioned in the repository.
+- **Location tools for the agent:** find copies for trade or rent within a radius of the user, and read the user's
+  own account. The tools are bound to the logged-in user on the server and do not take a user id, so the model
+  cannot query another person.
+- **Login,** so the API knows who the user is.
+- **Semantic search** over the game catalog with pgvector.
+- **Human approval** before any action that changes data (a trade request, a profile update).
+- **Long conversations:** summarize older messages and keep the last few intact.
 
 ## Credits
 

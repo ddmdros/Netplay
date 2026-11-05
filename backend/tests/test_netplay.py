@@ -1,4 +1,4 @@
-"""Backend do NetPlay sem rede: RAWG simulada, banco simulado e um modelo falso que chama ferramentas."""
+"""Backend do NetPlay sem rede: RAWG simulada e um modelo falso que chama ferramentas."""
 import os, unittest
 from unittest import mock
 
@@ -8,10 +8,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 from src import rawg
 from src.agents import game_agent
-from src.tools import database_tools, game_tools
-
-USER = "user-123"
-
+from src.tools import game_tools
 
 class FakeToolModel(GenericFakeChatModel):
     """Modelo falso que aceita bind_tools e devolve as mensagens dadas, em ordem."""
@@ -58,38 +55,6 @@ class RawgTest(unittest.TestCase):
         self.assertIn("inválido", game_tools.game_search_tool.invoke("   "))
 
 
-class DatabaseToolsTest(unittest.TestCase):
-    def fake_connect(self, rows):
-        cur = mock.MagicMock()
-        cur.fetchall.return_value = rows
-        conn = mock.MagicMock()
-        conn.cursor.return_value = cur
-        return (lambda: conn), cur
-
-    def test_queries_use_the_bound_user(self):
-        connect, cur = self.fake_connect([("Mario Kart", "Switch", "Bom", "Ana", 2500.0)])
-        _, search = database_tools.make_database_tools(USER, connect)
-        out = search.invoke({})
-        sql, params = cur.execute.call_args.args
-        self.assertEqual(params, (USER, USER, database_tools.SEARCH_RADIUS_METERS))
-        self.assertEqual(sql.count("%s"), len(params))  # the old query had no placeholders at all
-        self.assertIn("Mario Kart (Switch) | Estado: Bom | Dono: Ana (2.5 km)", out)
-
-    def test_tools_take_no_user_argument(self):
-        tools = database_tools.make_database_tools(USER, self.fake_connect([])[0])
-        for t in tools:
-            self.assertNotIn("user_id", t.args)  # the model cannot ask about another user
-
-    def test_account_not_found_and_db_error(self):
-        account, _ = database_tools.make_database_tools(USER, self.fake_connect([])[0])
-        self.assertEqual(account.invoke({}), "Usuário não encontrado.")
-
-        def broken():
-            raise OSError("sem conexão")
-        account, _ = database_tools.make_database_tools(USER, broken)
-        self.assertIn("sem conexão", account.invoke({}))
-
-
 class AgentTest(unittest.TestCase):
     def test_agent_calls_rawg_then_answers(self):
         model = FakeToolModel(messages=iter([
@@ -100,26 +65,21 @@ class AgentTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True), \
              mock.patch.object(game_tools, "get_pipeline") as gp:
             gp.return_value.fetch_and_structure_context.return_value = "Nome: Jogo Fictício"
-            agent = game_agent.build_agent(USER, model=model)
+            agent = game_agent.build_agent(model=model)
             result = agent.invoke({"messages": game_agent.to_messages([]) + [("user", "Me fala do Jogo Fictício")]})
         tool_msgs = [m for m in result["messages"] if isinstance(m, ToolMessage)]
         self.assertEqual(tool_msgs[0].content, "Nome: Jogo Fictício")
         self.assertEqual(result["messages"][-1].content, "Jogo Fictício é um RPG para maiores de 13 anos.")
 
-    def test_database_tools_only_with_database_url(self):
+    def test_agent_has_only_the_rawg_tool(self):
         captured = {}
 
         def fake_create_agent(model, tools, system_prompt):
             captured["tools"] = [t.name for t in tools]
 
         with mock.patch.object(game_agent, "create_agent", side_effect=fake_create_agent):
-            with mock.patch.dict(os.environ, {}, clear=True):
-                game_agent.build_agent(USER, model=object())
-                self.assertEqual(captured["tools"], ["buscar_informacoes_de_jogos"])
-            with mock.patch.dict(os.environ, {"DATABASE_URL": "postgresql://x"}, clear=True):
-                game_agent.build_agent(USER, model=object())
-                self.assertEqual(captured["tools"], ["buscar_informacoes_de_jogos", "get_account_info",
-                                                     "search_local_games"])
+            game_agent.build_agent(model=object())
+        self.assertEqual(captured["tools"], ["buscar_informacoes_de_jogos"])
 
     def test_history_conversion(self):
         msgs = game_agent.to_messages([{"role": "user", "content": "oi"}, {"role": "assistant", "content": "olá"},
@@ -138,16 +98,15 @@ class ApiTest(unittest.TestCase):
     def test_chat_passes_question_and_history(self):
         with mock.patch.object(game_agent, "build_agent") as build, \
              mock.patch.object(game_agent, "answer", return_value="resposta") as ans:
-            r = self.client.post("/api/chat", json={"input": "oi", "user_id": USER,
-                                                    "history": [{"role": "user", "content": "antes"}]})
+            r = self.client.post("/api/chat", json={"input": "oi", "history": [{"role": "user", "content": "antes"}]})
         self.assertEqual(r.json(), {"response": "resposta"})
-        build.assert_called_once_with(USER)
+        build.assert_called_once_with()
         self.assertEqual(ans.call_args.args[1:], ("oi", [{"role": "user", "content": "antes"}]))
 
     def test_validation_and_agent_errors(self):
-        self.assertEqual(self.client.post("/api/chat", json={"input": "", "user_id": USER}).status_code, 422)
+        self.assertEqual(self.client.post("/api/chat", json={"input": ""}).status_code, 422)
         with mock.patch.object(game_agent, "build_agent", side_effect=RuntimeError("sem chave")):
-            r = self.client.post("/api/chat", json={"input": "oi", "user_id": USER})
+            r = self.client.post("/api/chat", json={"input": "oi"})
         self.assertEqual(r.status_code, 500)
         self.assertIn("sem chave", r.json()["detail"])
 

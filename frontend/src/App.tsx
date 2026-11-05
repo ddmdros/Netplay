@@ -9,9 +9,6 @@ interface Message {
 }
 
 function App() {
-  // Usuário de demonstração: o projeto ainda não tem login.
-  const DEMO_USER_ID = "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d";
-
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -51,7 +48,6 @@ function App() {
       }));
       const botResponseText = await sendChatMessage(
         userMessageText,
-        DEMO_USER_ID,
         history,
       );
 
@@ -99,8 +95,8 @@ function App() {
         }}
       >
         <Gamepad2 size={28} color="#10b981" />
-        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 600 }}>
-          NetPlay Matcher MVP
+        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: 600, color: "#f9fafb" }}>
+          NetPlay
         </h1>
       </header>
 
@@ -154,6 +150,7 @@ function App() {
                 backgroundColor: msg.sender === "user" ? "#2563eb" : "#1f2937",
                 border: msg.sender === "user" ? "none" : "1px solid #374151",
                 color: "#f3f4f6",
+                textAlign: "left",
               }}
             >
               {msg.text}
@@ -214,7 +211,7 @@ function App() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pergunte sobre jogos perto de você ou sua reputação..."
+            placeholder="Pergunte sobre um jogo..."
             disabled={isLoading}
             style={{
               flex: 1,

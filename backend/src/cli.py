@@ -3,12 +3,10 @@ from dotenv import load_dotenv
 
 from .agents import game_agent
 
-DEMO_USER_ID = "a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d"
-
 
 def main():
     load_dotenv()
-    agent = game_agent.build_agent(DEMO_USER_ID)
+    agent = game_agent.build_agent()
     history = []
     print("NetPlay no terminal. Digite sua dúvida sobre jogos (ou 'sair').")
     while True:

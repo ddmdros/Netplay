@@ -17,7 +17,6 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     input: str = Field(min_length=1, max_length=2000)
-    user_id: str
     history: list[Message] = []
 
 
@@ -28,7 +27,7 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 def handle_chat_message(request: ChatRequest):
     try:
-        agent = game_agent.build_agent(request.user_id)
+        agent = game_agent.build_agent()
         history = [m.model_dump() for m in request.history[-MAX_HISTORY:]]
         return ChatResponse(response=game_agent.answer(agent, request.input, history))
     except Exception as e:

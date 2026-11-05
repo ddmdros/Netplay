@@ -4,14 +4,12 @@ import os
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
 
-from ..tools import database_tools
 from ..tools.game_tools import game_search_tool
 
 SYSTEM_PROMPT = """Você é o NetPlay, um assistente especialista em videogames.
 
 Sua missão é conversar com o usuário de forma amigável e ajudá-lo a descobrir jogos, conferir a classificação
-etária (público recomendado), estúdios e onde comprar ou baixar, e, quando disponível, encontrar jogos físicos
-para troca ou aluguel perto dele.
+etária (público recomendado), estúdios e onde comprar ou baixar.
 
 Regras:
 1. Para qualquer dado de jogo (lançamento, estúdio, gênero, classificação, lojas), use a ferramenta
@@ -29,12 +27,9 @@ def default_model():
     return ChatOpenAI(model=MODEL, temperature=0.2)
 
 
-def build_agent(user_id: str, model=None):
-    """Agente para um usuário. As ferramentas de banco entram só com DATABASE_URL definida."""
-    tools = [game_search_tool]
-    if database_tools.enabled():
-        tools += database_tools.make_database_tools(user_id)
-    return create_agent(model or default_model(), tools=tools, system_prompt=SYSTEM_PROMPT)
+def build_agent(model=None):
+    """Agente com uma ferramenta: a busca de jogos na API RAWG."""
+    return create_agent(model or default_model(), tools=[game_search_tool], system_prompt=SYSTEM_PROMPT)
 
 
 def to_messages(history):
