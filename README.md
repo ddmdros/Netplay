@@ -102,5 +102,6 @@ A primeira versão (maio de 2026) usava `create_tool_calling_agent` e `AgentExec
 
 ## Créditos
 
-Feito em dupla por Diogo Medeiros e Stephanie. A revisão de novembro de 2026 (migração, correções, testes e
-CI) veio depois.
+Feito em dupla por Diogo Medeiros ([GitHub](https://github.com/ddmdros)) e Stephanie Pinho
+([GitHub](https://github.com/stephanielumertz), [LinkedIn](https://www.linkedin.com/in/stephanielumertz/)).
+A revisão de novembro de 2026 (migração, correções, testes e CI) veio depois.
