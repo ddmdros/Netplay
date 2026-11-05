@@ -1,51 +1,51 @@
 # NetPlay
 
-Assistente de games com **tool calling**: um agente LangChain (OpenAI `gpt-4o-mini`) que decide sozinho quando
-buscar dados reais de jogos na [API RAWG](https://rawg.io/apidocs) (lançamento, estúdio, gênero,
-classificação etária e lojas), atrás de uma API **FastAPI** e com um chat em **React + TypeScript**.
+A games assistant with **tool calling**: a LangChain agent (OpenAI `gpt-4o-mini`) that decides on its own when to
+fetch real game data from the [RAWG API](https://rawg.io/apidocs) (release date, studio, genre, age rating and
+stores), behind a **FastAPI** API and with a chat in **React + TypeScript**.
 
-A ideia de produto por trás é uma economia P2P de mídia física: encontrar perto de você jogos para trocar ou
-alugar. Essa parte (Postgres + PostGIS) já tem as ferramentas do agente, mas ainda não tem o esquema do banco
-neste repositório. Ela só é ligada quando `DATABASE_URL` está definida.
+The product idea behind it is a P2P economy for physical media: finding games near you to trade or rent. That
+part (Postgres + PostGIS) already has the agent's tools, but the database schema is not in this repository yet.
+It is only turned on when `DATABASE_URL` is set.
 
-## Como funciona
+## How it works
 
 ```mermaid
 sequenceDiagram
     participant U as Chat (React)
     participant A as FastAPI /api/chat
-    participant G as Agente (LangChain)
+    participant G as Agent (LangChain)
     participant L as gpt-4o-mini
-    participant R as API RAWG
-    U->>A: pergunta + histórico + user_id
-    A->>G: monta o agente do usuário
-    G->>L: mensagens + ferramentas disponíveis
-    L-->>G: chamada de ferramenta buscar_informacoes_de_jogos("...")
-    G->>R: busca + detalhes de cada jogo
-    R-->>G: texto estruturado (nome, gênero, estúdio, público, lojas)
-    G->>L: resultado da ferramenta
-    L-->>G: resposta final
-    G-->>A: texto
-    A-->>U: resposta
+    participant R as RAWG API
+    U->>A: question + history + user_id
+    A->>G: builds the user's agent
+    G->>L: messages + available tools
+    L-->>G: tool call buscar_informacoes_de_jogos("...")
+    G->>R: search + details of each game
+    R-->>G: structured text (name, genre, studio, audience, stores)
+    G->>L: tool result
+    L-->>G: final answer
+    G-->>A: text
+    A-->>U: answer
 ```
 
-- **Tool calling:** o modelo recebe a descrição das ferramentas e escolhe quando chamar. O prompt proíbe
-  inventar dados de jogo, e a resposta sai do que a RAWG devolveu.
-- **Segurança das ferramentas de banco:** elas são criadas por requisição já presas ao `user_id` do servidor e
-  não recebem o id como argumento, então o modelo não consegue consultar outra pessoa trocando o id numa
-  chamada. As consultas são parametrizadas.
-- **Histórico:** o front manda as últimas mensagens, e a API usa as 10 mais recentes.
+- **Tool calling:** the model receives the tools' descriptions and chooses when to call them. The prompt forbids
+  making up game data, and the answer comes from what RAWG returned.
+- **Database tool safety:** the tools are created per request, already bound to the server-side `user_id`, and
+  do not take the id as an argument, so the model cannot query another person by changing the id in a call. The
+  queries are parameterized.
+- **History:** the front end sends the latest messages, and the API uses the 10 most recent.
 
-## Como rodar
+## Running it
 
-Backend (Python 3.12+, com [uv](https://docs.astral.sh/uv/)):
+Backend (Python 3.12+, with [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 cd backend
-cp .env.example .env               # preencha OPENAI_API_KEY e RAWG_API_KEY
+cp .env.example .env               # fill in OPENAI_API_KEY and RAWG_API_KEY
 uv sync
-uv run uvicorn src.main:app --reload       # API em http://127.0.0.1:8000 (docs em /docs)
-uv run python -m src.cli                   # ou converse pelo terminal
+uv run uvicorn src.main:app --reload       # API at http://127.0.0.1:8000 (docs at /docs)
+uv run python -m src.cli                   # or chat from the terminal
 ```
 
 Frontend (Node 22):
@@ -56,52 +56,53 @@ npm ci
 npm run dev                        # http://localhost:5173
 ```
 
-## Testes
+## Tests
 
 ```bash
 cd backend && uv run --group dev python -m unittest discover -s tests -t . -v
 cd frontend && npm run lint && npm run build
 ```
 
-Os testes do backend rodam sem rede e sem chaves de API:
-- a RAWG é simulada, para conferir o texto estruturado e os erros;
-- o banco é simulado, para conferir que a consulta usa o usuário certo e que a ferramenta não recebe `user_id`;
-- um modelo falso que chama ferramentas passa pelo agente de verdade (`create_agent`), da chamada da ferramenta
-  até a resposta final;
-- a API é testada com o `TestClient` do FastAPI.
+The backend tests run with no network and no API keys:
+- RAWG is mocked, to check the structured text and the errors;
+- the database is mocked, to check that the query uses the right user and that the tool does not take a `user_id`;
+- a fake model that calls tools goes through the real agent (`create_agent`), from the tool call to the final
+  answer;
+- the API is tested with FastAPI's `TestClient`.
 
-O CI roda os testes e o build do front a cada push.
+CI runs the tests and the front-end build on every push.
 
-## Estrutura
+## Structure
 
 ```text
 backend/src/
-  main.py               app FastAPI, CORS
+  main.py               FastAPI app, CORS
   api/chat_routes.py    POST /api/chat
-  agents/game_agent.py  prompt, ferramentas e create_agent
-  tools/game_tools.py   ferramenta da RAWG
-  tools/database_tools.py  ferramentas P2P (opcionais)
-  rawg.py               cliente da API RAWG
-  cli.py                chat no terminal
-frontend/src/           chat em React
+  agents/game_agent.py  prompt, tools and create_agent
+  tools/game_tools.py   RAWG tool
+  tools/database_tools.py  P2P tools (optional)
+  rawg.py               RAWG API client
+  cli.py                terminal chat
+frontend/src/           React chat
 ```
 
-## Histórico
+## History
 
-A primeira versão (maio de 2026) usava `create_tool_calling_agent` e `AgentExecutor`, que saíram do pacote
-`langchain` na versão 1.x. Com as dependências atuais, o backend não iniciava. A revisão de novembro de 2026:
+The first version (May 2026) used `create_tool_calling_agent` and `AgentExecutor`, which were removed from the
+`langchain` package in version 1.x. With current dependencies, the backend did not start. The November 2026
+revision:
 
-- migrou o agente para `create_agent`;
-- corrigiu os imports (a rota chamava uma função inexistente, e o agente importava a ferramenta do arquivo
-  errado);
-- corrigiu a consulta de jogos próximos, que ignorava o usuário (usava um id fixo) e passava parâmetros que a
-  SQL não tinha;
-- prendeu as ferramentas de banco ao usuário no servidor;
-- tirou um prompt duplicado sem uso, o script de terminal duplicado e o `egg-info` versionado;
-- restringiu o CORS e acrescentou o histórico da conversa, os testes e o CI.
+- migrated the agent to `create_agent`;
+- fixed the imports (the route called a function that did not exist, and the agent imported the tool from the
+  wrong file);
+- fixed the nearby-games query, which ignored the user (it used a hard-coded id) and passed parameters the SQL
+  did not have;
+- bound the database tools to the user on the server;
+- removed an unused duplicate prompt, the duplicate terminal script and the committed `egg-info`;
+- restricted CORS and added the conversation history, the tests and CI.
 
-## Créditos
+## Credits
 
-Feito em dupla por Diogo Medeiros ([GitHub](https://github.com/ddmdros)) e Stephanie Pinho
+Built as a pair by Diogo Medeiros ([GitHub](https://github.com/ddmdros)) and Stephanie Pinho
 ([GitHub](https://github.com/stephanielumertz), [LinkedIn](https://www.linkedin.com/in/stephanielumertz/)).
-A revisão de novembro de 2026 (migração, correções, testes e CI) veio depois.
+The November 2026 revision (migration, fixes, tests and CI) came later.
